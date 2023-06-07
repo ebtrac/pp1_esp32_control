@@ -10,10 +10,12 @@ uint8_t bank[] = {1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1};
 void setup() {
     // initialize inputs and outputs for DAT bus
     setupPins();
+    enableLevelShifterOutputs();
+    enableMuxOutputs();
+    setMuxChannel(MCU_CH); //set MCU to control the DSP
 
-    // TODO: initialize I2C
 
-    // TODO: initialize WiFi/BLE
+    // TODO: initialize BLE
 
 }
 

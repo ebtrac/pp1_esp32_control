@@ -20,6 +20,10 @@ void setupPins(void) {
     pinMode(DAT12, OUTPUT);
     pinMode(DAT13, OUTPUT);
     pinMode(DAT14, OUTPUT);
+
+    pinMode(NOT_DAT_OE_3_3V, OUTPUT);
+    pinMode(DAT_SEL_3_3V, OUTPUT);
+    pinMode(LVLSHFTOE, OUTPUT);
 }
 
 // sends a byte,address, and bank to the DAT bus
@@ -49,4 +53,34 @@ void writeDAT(uint8_t value, uint8_t address, uint8_t bank) {
     delayMicroseconds(3);
     digitalWrite(bank==0?DAT13:DAT14, LOW);
     delayMicroseconds(3);
+}
+
+void enableLevelShifterOutputs(void) {
+    digitalWrite(LVLSHFTOE, HIGH);
+}
+
+void disableLevelShifterOutputs(void) {
+    digitalWrite(LVLSHFTOE, LOW);
+}
+
+void disableMuxOutputs(void) {
+    digitalWrite(NOT_DAT_OE_3_3V, HIGH); //active low
+}
+
+void enableMuxOutputs(void) {
+    digitalWrite(NOT_DAT_OE_3_3V, LOW); //active low
+}
+
+// Ch 0 = MCU controls the DSP
+// Ch 1 = ESP32 controls the DSP
+void setMuxChannel(int channel) {
+    if(channel == MCU_CH || channel == ESP_CH) {
+        digitalWrite(DAT_SEL_3_3V, channel);
+    }
+}
+
+// returns 0 = MCU controls the DSP
+// returns 1 = ESP32 controls the DSP
+int getMuxChannel(void) {
+    return digitalRead(DAT_SEL_3_3V);
 }
