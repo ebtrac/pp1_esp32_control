@@ -1,27 +1,27 @@
 ﻿GPIO,USE,NOTE
-36,,Input Only
-39,,Input Only
-34,,Input Only
-35,DAT0,Input Only
-32,,
-33,DAT1,
+0,,"Strapped, pulled up during boot"
+1,,"TX0, Used in programming"
+2,DAT_BUS_LEVEL_SHIFTER_OE,"Strapped, pulled down during boot"
+3,,"RX0, Used in programming"
+4,DAT10,Pulled Low
+5,DAT13,Pulled High
+12,DAT6,Pulled Low
+13,DAT7,
+14,DAT5,
+15,,"MTDO, strapped pulled up during boot"
+16,DAT9,
+17,DAT14,
+18,DAT12,
+19,DAT11,
+21,NOT_BUF_OE,I2C SDA also
+22,BUF_CTL_LEVEL_SHIFTER_OE,I2C SCL also
+23,DAT8,
 25,DAT2,
 26,DAT3,
 27,DAT4,
-14,DAT5,
-12,DAT6,
-13,DAT7,
-23,DAT8,
-22,NOT_DAT_OE_3_3V,
-1,,"TX0, Used in programming"
-3,,"RX0, Used in programming"
-21,DAT_SEL_3_3V,
-19,DAT11,
-18,DAT12,
-5,DAT13,
-17,DAT14,
-16,DAT9,
-4,DAT10,
-2,LVLSHFTOE,"Strapped, pulled down during boot"
-15,,"MTDO, strapped pulled up during boot"
-0,,"Strapped, pulled up during boot"
+32,,
+33,DAT1,
+34,,Input Only
+35,DAT0,Input Only
+36,,Input Only
+39,,Input Only

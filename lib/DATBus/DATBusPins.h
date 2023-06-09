@@ -15,6 +15,6 @@
 #define DAT13	5 //NORMALLY HIGH during boot //appears to be a strapping pin used for boot configurations
 #define DAT14	17
 
-#define DAT_SEL_3_3V    21
-#define NOT_DAT_OE_3_3V 22
-#define LVLSHFTOE       2 //has a pulldown resistor during boot
+#define NOT_BUF_OE    21
+#define DAT_BUS_LEVEL_SHIFTER_OE 2 //has a pulldown resistor during boot
+#define BUF_CTL_LEVEL_SHIFTER_OE 22
