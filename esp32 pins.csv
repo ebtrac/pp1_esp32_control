@@ -4,7 +4,7 @@
 2,DAT_BUS_LEVEL_SHIFTER_OE,"Strapped, pulled down during boot"
 3,,"RX0, Used in programming"
 4,DAT10,Pulled Low
-5,DAT13,Pulled High
+5,,Pulled High
 12,DAT6,Pulled Low
 13,DAT7,
 14,DAT5,
@@ -19,7 +19,7 @@
 25,DAT2,
 26,DAT3,
 27,DAT4,
-32,,
+32,DAT13,
 33,DAT1,
 34,,Input Only
 35,DAT0,Input Only

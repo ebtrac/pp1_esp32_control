@@ -1,7 +1,7 @@
-#include "Arduino.h"
+#include <Arduino.h>
 #include <DATBus.h>
 #include <DATBusPins.h>
-#include <queue>
+#include <queue> 
 
 #define MAX_QUEUE_LEN 100
 
@@ -16,6 +16,11 @@ uint8_t typicalPacketDefaultValues[] = {68,149,184,103,38,174,64,130,20,255,0,0,
 uint16_t busWord = 0; // temporarily stores the word being read from the bus during an isr
 
 std::queue<uint16_t> busQueue;
+
+#define MODE_INIT 0
+#define MODE_LISTEN 1
+#define MODE_HIJACK 2
+uint8_t mode = MODE_INIT; 
 
 size_t getBusQueueSize() {
     return busQueue.size();
@@ -80,14 +85,14 @@ void setDATBusLevelShifterHiZ(void) {
 }
 
 // writes a typical 20 word packet to the DAT bus when DAT0 falls
-void ARDUINO_ISR_ATTR dat0isr() {
+void IRAM_ATTR dat0isr() {
     for(int i = 0; i < 20; i++) {
         writeDAT(dspSettings[typicalPacketAddresses[i]][typicalPacketBanks[i]], typicalPacketAddresses[i], typicalPacketBanks[i]);
     }
 }
 
 // reads a word from the DAT bus when DAT13 rises
-void ARDUINO_ISR_ATTR dat13isr() {
+void IRAM_ATTR dat13isr() {
     busWord = 0;
     for (int i = 0; i < 12; i++) {
         busWord |= (digitalRead(datLines[i]) << i);
@@ -98,7 +103,7 @@ void ARDUINO_ISR_ATTR dat13isr() {
 }
 
 // reads a word from the DAT bus when DAT14 rises
-void ARDUINO_ISR_ATTR dat14isr() {
+void IRAM_ATTR dat14isr() {
     busWord = 0;
     for (int i = 0; i < 12; i++) {
         busWord |= (digitalRead(datLines[i]) << i);
@@ -154,8 +159,10 @@ void setDAT1_14PinMode(int mode) {
 }
 
 void listenMode(void) {
+    if (mode == MODE_LISTEN) return;
+
     // disable interrupts
-    noInterrupts();
+    if(mode != MODE_INIT) noInterrupts();
 
     // set DAT BUS level shifters to Hi-Z
     digitalWrite(DAT_BUS_LEVEL_SHIFTER_OE, 0);
@@ -168,20 +175,22 @@ void listenMode(void) {
     setDAT1_14PinMode(INPUT);
 
     // detatch interrupt from DAT0
-    detachInterrupt(DAT0);
+    if(mode == MODE_HIJACK) detachInterrupt(digitalPinToInterrupt(DAT0));
 
     // reconfigure interrupts to be triggered by DAT13 and DAT14
-    attachInterrupt(DAT13, dat13isr, RISING);
-    attachInterrupt(DAT14, dat14isr, RISING);
+    attachInterrupt(digitalPinToInterrupt(DAT13), dat13isr, RISING);
+    attachInterrupt(digitalPinToInterrupt(DAT14), dat14isr, RISING);
 
     // set DAT BUS level shifters to normal operation
     digitalWrite(DAT_BUS_LEVEL_SHIFTER_OE, 1);
 
     // enable interrupts
     interrupts();
+    mode = MODE_LISTEN;
 }
 
 void hijackMode(void) {
+    if (mode == MODE_HIJACK) return;
     // disable interrupts
     noInterrupts();
 
@@ -195,21 +204,26 @@ void hijackMode(void) {
     setDAT1_14PinMode(OUTPUT);
 
     // detatch interrupt from DAT13,DAT14
-    detachInterrupt(DAT13);
-    detachInterrupt(DAT14);
+    if(mode == MODE_LISTEN) {
+        detachInterrupt(digitalPinToInterrupt(DAT13));
+        detachInterrupt(digitalPinToInterrupt(DAT14));
+    }
 
     // reconfigure interrupts to be triggered by DAT0
-    attachInterrupt(DAT0, dat0isr, FALLING);
+    attachInterrupt(digitalPinToInterrupt(DAT0), dat0isr, FALLING);
 
     // set DAT BUS level shifters to normal operation
     digitalWrite(DAT_BUS_LEVEL_SHIFTER_OE, 1);
 
     // enable interrupts
-    interrupts();    
+    interrupts();
+
+    mode = MODE_HIJACK;
 }
 
 // configures all pins and sets the ESP into listen mode
-void init(void) {
+void initDatBus(void) {
+    mode = MODE_INIT;
     initFixedModePins();
     // set BUF CTL level shifter to HiZ
     digitalWrite(BUF_CTL_LEVEL_SHIFTER_OE, 0);

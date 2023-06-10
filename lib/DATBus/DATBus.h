@@ -1,6 +1,10 @@
 #include "Arduino.h"
 
-void init();
+void hijackMode(void);
+
+void listenMode(void);
+
+void initDatBus();
 
 size_t getBusQueueSize();
 

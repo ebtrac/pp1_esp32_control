@@ -5,14 +5,14 @@
 #define DAT3	26
 #define DAT4	27
 #define DAT5	14 //NORMALLY HIGH during boot
-#define DAT6	12
+#define DAT6	12 //pulled low
 #define DAT7	13
 #define DAT8	23 
 #define DAT9	16
-#define DAT10	4
+#define DAT10	4 //pulled low
 #define DAT11	19
 #define DAT12	18
-#define DAT13	5 //NORMALLY HIGH during boot //appears to be a strapping pin used for boot configurations
+#define DAT13	32 
 #define DAT14	17
 
 #define NOT_BUF_OE    21
