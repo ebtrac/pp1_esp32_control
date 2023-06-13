@@ -1,9 +1,10 @@
 #include <Arduino.h>
 #include <DATBus.h>
 #include <DATBusPins.h>
-#include <queue> 
+#include <SimpleCollections.h>
+#include <SCCircularBuffer.h>
 
-#define MAX_QUEUE_LEN 100
+#define MAX_BUFFER_LEN 100
 
 uint8_t datLines[] = {DAT1, DAT2, DAT3, DAT4, DAT5, DAT6, DAT7, DAT8, DAT9, DAT10, DAT11, DAT12, DAT13, DAT14};
 
@@ -13,38 +14,22 @@ uint8_t typicalPacketAddresses[] = {9, 11, 3, 5, 1, 8, 7, 7, 0, 5, 11, 4, 13, 13
 uint8_t typicalPacketBanks[] = {1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1};
 uint8_t typicalPacketDefaultValues[] = {68,149,184,103,38,174,64,130,20,255,0,0,247,0,0,60,47,147,25,14};
 
-uint16_t busWord = 0; // temporarily stores the word being read from the bus during an isr
+uint16_t busWord13 = 0; // temporarily stores the word being read from the bus during an isr
+uint16_t busWord14 = 0; // temporarily stores the word being read from the bus during an isr
 
-std::queue<uint16_t> busQueue;
+GenericCircularBuffer<uint16_t> busBuffer(MAX_BUFFER_LEN);
 
 #define MODE_INIT 0
 #define MODE_LISTEN 1
 #define MODE_HIJACK 2
 uint8_t mode = MODE_INIT; 
 
-size_t getBusQueueSize() {
-    return busQueue.size();
+uint16_t getBuffer() {
+    return busBuffer.get();
 }
 
-uint16_t getBusQueueFront() {
-    return busQueue.front();
-}
-
-bool busQueueEmpty() {
-    return busQueue.empty();
-}
-
-void popBusQueue() {
-    busQueue.pop();
-}
-
-// pushes to the queue if length is less than MAX_QUEUE_LEN.
-// if full, pops the oldest value from the queue before adding new one
-void tryPush(uint16_t word, std::queue<uint16_t>& q) {
-    if (q.size() >= MAX_QUEUE_LEN) {
-        q.pop();
-    }
-    q.push(word);
+bool busBufferAvailable() {
+    return busBuffer.available();
 }
 
 // sends a byte,address, and bank to the DAT bus
@@ -93,24 +78,24 @@ void IRAM_ATTR dat0isr() {
 
 // reads a word from the DAT bus when DAT13 rises
 void IRAM_ATTR dat13isr() {
-    busWord = 0;
-    for (int i = 0; i < 12; i++) {
-        busWord |= (digitalRead(datLines[i]) << i);
+    busWord13 = 0;
+    for (uint8_t i = 0; i < 12; i++) {
+        busWord13 |= (digitalRead(datLines[i]) << i);
     }
-    busWord |= (1<<12);
+    busWord13 |= (1<<12);
     // push to word stack with bank = 0
-    tryPush(busWord, busQueue);
+    busBuffer.put(busWord13);
 }
 
 // reads a word from the DAT bus when DAT14 rises
 void IRAM_ATTR dat14isr() {
-    busWord = 0;
-    for (int i = 0; i < 12; i++) {
-        busWord |= (digitalRead(datLines[i]) << i);
+    busWord14 = 0;
+    for (uint8_t i = 0; i < 12; i++) {
+        busWord14 |= (digitalRead(datLines[i]) << i);
     }
-    busWord |= (1<<13);
+    busWord14 |= (1<<13);
     // push to word stack with bank = 1
-    tryPush(busWord, busQueue);
+    busBuffer.put(busWord14);
 }
 
 

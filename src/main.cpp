@@ -3,7 +3,6 @@
 #include <BluetoothSerial.h>
 
 #define BUF_SIZE 128
-
 String device_name = "ESP32-VDNX-PP-1";
 
 BluetoothSerial SerialBT;
@@ -41,10 +40,10 @@ void loop() {
   //   }
   // }
 
-  if(SerialBT.connected() && !busQueueEmpty()) {
+  if(SerialBT.connected() && busBufferAvailable()) {
+    uint16_t bufItem = getBuffer();
     // write a bus queue item to the BLE in hex followed by /r/n
-    SerialBT.printf("%04x\r\n", getBusQueueFront());
-    popBusQueue();
+    SerialBT.printf("%04x\r\n", bufItem);
   }
 
   //DEBUG: write debug data
