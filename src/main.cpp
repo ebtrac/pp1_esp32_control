@@ -43,7 +43,7 @@ void loop() {
   if(SerialBT.connected() && busBufferAvailable()) {
     uint16_t bufItem = getBuffer();
     // write a bus queue item to the BLE in hex followed by /r/n
-    SerialBT.printf("%04x\r\n", bufItem);
+    SerialBT.printf("%04x\r\n", bufItem); /////////////////////////////// How long does this take?
   }
 
   //DEBUG: write debug data

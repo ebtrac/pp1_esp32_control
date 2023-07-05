@@ -6,7 +6,11 @@
 
 #define MAX_BUFFER_LEN 100
 
-uint8_t datLines[] = {DAT1, DAT2, DAT3, DAT4, DAT5, DAT6, DAT7, DAT8, DAT9, DAT10, DAT11, DAT12, DAT13, DAT14};
+#define FAST_READ(pin_index) ((*datPinPorts[pin_index] & datPinMasks[pin_index])!=0)
+
+uint8_t datPins[] = {DAT1, DAT2, DAT3, DAT4, DAT5, DAT6, DAT7, DAT8, DAT9, DAT10, DAT11, DAT12, DAT13, DAT14};
+uint32_t datPinMasks[14];
+volatile uint32_t *datPinPorts[14];
 
 uint8_t dspSettings[16][2]; //first index is address, second index is bank
 
@@ -49,7 +53,7 @@ void writeDAT(uint8_t value, uint8_t address, uint8_t bank) {
     // start outputting!
     // setup value and address outputs
     for(int i = 0; i < 12; i++) {
-        digitalWrite(datLines[i], word[i]);
+        digitalWrite(datPins[i], word[i]);
     }
     // wait for the circuit to catch up
     delayMicroseconds(2);
@@ -79,9 +83,23 @@ void IRAM_ATTR dat0isr() {
 // reads a word from the DAT bus when DAT13 rises
 void IRAM_ATTR dat13isr() {
     busWord13 = 0;
-    for (uint8_t i = 0; i < 12; i++) {
-        busWord13 |= (digitalRead(datLines[i]) << i);
-    }
+    // for (uint8_t i = 0; i < 12; i++) {
+    //     // busWord13 |= (digitalRead(datPins[i]) << i);
+    //     // busWord13 |= (digitalRead(datPins[i]) << i);
+    //     busWord13 |= (FAST_READ(i) << i);
+    // }
+    busWord13 |= (FAST_READ(0) << 0);
+    busWord13 |= (FAST_READ(1) << 1);
+    busWord13 |= (FAST_READ(2) << 2);
+    busWord13 |= (FAST_READ(3) << 3);
+    busWord13 |= (FAST_READ(4) << 4);
+    busWord13 |= (FAST_READ(5) << 5);
+    busWord13 |= (FAST_READ(6) << 6);
+    busWord13 |= (FAST_READ(7) << 7);
+    busWord13 |= (FAST_READ(8) << 8);
+    busWord13 |= (FAST_READ(9) << 9);
+    busWord13 |= (FAST_READ(10) << 10);
+    busWord13 |= (FAST_READ(11) << 11);
     busWord13 |= (1<<12);
     // push to word stack with bank = 0
     busBuffer.put(busWord13);
@@ -90,9 +108,22 @@ void IRAM_ATTR dat13isr() {
 // reads a word from the DAT bus when DAT14 rises
 void IRAM_ATTR dat14isr() {
     busWord14 = 0;
-    for (uint8_t i = 0; i < 12; i++) {
-        busWord14 |= (digitalRead(datLines[i]) << i);
-    }
+    // for (uint8_t i = 0; i < 12; i++) {
+    //     // busWord14 |= (digitalRead(datPins[i]) << i);
+    //     busWord14 |= (FAST_READ(i) << i);
+    // }
+    busWord14 |= (FAST_READ(0) << 0);
+    busWord14 |= (FAST_READ(1) << 1);
+    busWord14 |= (FAST_READ(2) << 2);
+    busWord14 |= (FAST_READ(3) << 3);
+    busWord14 |= (FAST_READ(4) << 4);
+    busWord14 |= (FAST_READ(5) << 5);
+    busWord14 |= (FAST_READ(6) << 6);
+    busWord14 |= (FAST_READ(7) << 7);
+    busWord14 |= (FAST_READ(8) << 8);
+    busWord14 |= (FAST_READ(9) << 9);
+    busWord14 |= (FAST_READ(10) << 10);
+    busWord14 |= (FAST_READ(11) << 11);
     busWord14 |= (1<<13);
     // push to word stack with bank = 1
     busBuffer.put(busWord14);
@@ -206,9 +237,17 @@ void hijackMode(void) {
     mode = MODE_HIJACK;
 }
 
+void initPinMasksAndPorts() {
+    for(int i = 0; i<14; i++) {
+        datPinMasks[i] = digitalPinToBitMask(datPins[i]);
+        datPinPorts[i] = portInputRegister(digitalPinToPort(datPins[i]));
+    }
+}
+
 // configures all pins and sets the ESP into listen mode
 void initDatBus(void) {
     mode = MODE_INIT;
+    initPinMasksAndPorts();
     initFixedModePins();
     // set BUF CTL level shifter to HiZ
     digitalWrite(BUF_CTL_LEVEL_SHIFTER_OE, 0);
