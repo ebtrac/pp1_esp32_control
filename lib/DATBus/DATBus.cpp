@@ -65,14 +65,6 @@ void writeDAT(uint8_t value, uint8_t address, uint8_t bank) {
     delayMicroseconds(3);
 }
 
-void unsetDATBusLevelShiftHiZ(void) {
-    digitalWrite(DAT_BUS_LEVEL_SHIFTER_OE, 1);
-}
-
-void setDATBusLevelShifterHiZ(void) {
-    digitalWrite(DAT_BUS_LEVEL_SHIFTER_OE, 0);
-}
-
 // writes a typical 20 word packet to the DAT bus when DAT0 falls
 void IRAM_ATTR dat0isr() {
     for(int i = 0; i < 20; i++) {
@@ -133,8 +125,8 @@ void IRAM_ATTR dat14isr() {
 // initialize the pins that will never change pinMode
 void initFixedModePins(void) {
     pinMode(DAT0, INPUT);
-    pinMode(DAT_BUS_LEVEL_SHIFTER_OE, OUTPUT);
-    pinMode(BUF_CTL_LEVEL_SHIFTER_OE, OUTPUT);
+    pinMode(LISTEN, OUTPUT);
+    pinMode(HIJACK, OUTPUT);
     pinMode(NOT_BUF_OE, OUTPUT);
 }
 
@@ -180,15 +172,15 @@ void listenMode(void) {
     // disable interrupts
     if(mode != MODE_INIT) noInterrupts();
 
-    // set DAT BUS level shifters to Hi-Z
-    digitalWrite(DAT_BUS_LEVEL_SHIFTER_OE, 0);
+    // set HIJACK level shifters to Hi-Z
+    digitalWrite(HIJACK, 0);
 
     // enable communication between native MCU and DSP
     // aka, enable the tristate buffers on the DAT Bus
     digitalWrite(NOT_BUF_OE, 0);
 
-    // set all DAT pins to be inputs
-    setDAT1_14PinMode(INPUT);
+    // set all DAT pins to be inputs with pullups!
+    setDAT1_14PinMode(INPUT_PULLUP);
 
     // detatch interrupt from DAT0
     if(mode == MODE_HIJACK) detachInterrupt(digitalPinToInterrupt(DAT0));
@@ -197,11 +189,12 @@ void listenMode(void) {
     attachInterrupt(digitalPinToInterrupt(DAT13), dat13isr, RISING);
     attachInterrupt(digitalPinToInterrupt(DAT14), dat14isr, RISING);
 
-    // set DAT BUS level shifters to normal operation
-    digitalWrite(DAT_BUS_LEVEL_SHIFTER_OE, 1);
+    // set LISTEN level shifters to normal operation
+    digitalWrite(LISTEN, 1);
 
     // enable interrupts
     interrupts();
+
     mode = MODE_LISTEN;
 }
 
@@ -210,8 +203,8 @@ void hijackMode(void) {
     // disable interrupts
     noInterrupts();
 
-    // set DAT BUS level shifters to Hi-Z
-    digitalWrite(DAT_BUS_LEVEL_SHIFTER_OE, 0);
+    // set LISTEN level shifters to Hi-Z
+    digitalWrite(LISTEN, 0);
 
     // disable communication between native MCU and DSP
     digitalWrite(NOT_BUF_OE, 1);
@@ -228,8 +221,8 @@ void hijackMode(void) {
     // reconfigure interrupts to be triggered by DAT0
     attachInterrupt(digitalPinToInterrupt(DAT0), dat0isr, FALLING);
 
-    // set DAT BUS level shifters to normal operation
-    digitalWrite(DAT_BUS_LEVEL_SHIFTER_OE, 1);
+    // set HIJACK level shifters to normal operation
+    digitalWrite(HIJACK, 1);
 
     // enable interrupts
     interrupts();
@@ -249,16 +242,14 @@ void initDatBus(void) {
     mode = MODE_INIT;
     initPinMasksAndPorts();
     initFixedModePins();
-    // set BUF CTL level shifter to HiZ
-    digitalWrite(BUF_CTL_LEVEL_SHIFTER_OE, 0);
-     // set DAT BUS level shifters to Hi-Z
-    digitalWrite(DAT_BUS_LEVEL_SHIFTER_OE, 0);
+    // set HIJACK level shifter to HiZ
+    digitalWrite(HIJACK, 0);
+     // set LISTEN level shifters to Hi-Z
+    digitalWrite(LISTEN, 0);
     // initialize DSP_Settings array
     initSettings();
     // initialize the queue
     // begin listen mode
     listenMode();
-    // set BUF CTL level shifter to normal operation (and don't touch it again!)
-    digitalWrite(BUF_CTL_LEVEL_SHIFTER_OE, 1);
 }
 
