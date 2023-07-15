@@ -1,5 +1,6 @@
 #include <Arduino.h>
-#include <DATBus.h>
+// #include <DATBus.h>
+#include <VDNXBus.h>
 #include <BluetoothSerial.h>
 
 #define BUF_SIZE 128
@@ -7,15 +8,17 @@ String device_name = "ESP32-VDNX-PP-1";
 
 BluetoothSerial SerialBT;
 
-char response[BUF_SIZE];
-int responsepos = 0;
+//char response[BUF_SIZE];
+//int responsepos = 0;
 // DEBUG DATA
 // uint8_t data[] = {68, 149, 184, 103, 38, 174, 64, 130, 20, 255, 0, 0, 247, 0, 0, 60, 47, 147, 25, 14};
 // uint8_t addr[] = {9, 11, 3, 5, 1, 8, 7, 7, 0, 5, 11, 4, 13, 13, 0, 8, 12, 4, 2, 12};
 // uint8_t bank[] = {1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1};
 
+VDNXBus Bus;
+
 void setup() {
-    initDatBus();
+    Bus.initDatBus();
 
     //Serial.begin(115200);
 
@@ -40,8 +43,8 @@ void loop() {
   //   }
   // }
 
-  if(SerialBT.connected() && busBufferAvailable() && (getDAT0() == 1)) {
-    uint16_t bufItem = getBuffer();
+  if(SerialBT.connected() && Bus.busBufferAvailable() && (Bus.getDAT0() == 1)) {
+    uint16_t bufItem = Bus.getBuffer();
     // write a bus queue item to the BLE in hex followed by /r/n
     SerialBT.printf("%04x\r\n", bufItem); /////////////////////////////// How long does this take?
     
