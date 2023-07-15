@@ -4,7 +4,7 @@
 #include <SimpleCollections.h>
 #include <SCCircularBuffer.h>
 
-#define MAX_BUFFER_LEN 100
+#define MAX_BUFFER_LEN 256
 
 #define FAST_READ(pin_index) ((*datPinPorts[pin_index] & datPinMasks[pin_index])!=0)
 
@@ -23,6 +23,10 @@ uint16_t busWord14 = 0; // temporarily stores the word being read from the bus d
 
 GenericCircularBuffer<uint16_t> busBuffer(MAX_BUFFER_LEN);
 
+unsigned long debouncing_time = 1; // debouncing time in microseconds
+volatile unsigned long last_microsDAT13 = 0; 
+volatile unsigned long last_microsDAT14 = 0; 
+
 #define MODE_INIT 0
 #define MODE_LISTEN 1
 #define MODE_HIJACK 2
@@ -34,6 +38,10 @@ uint16_t getBuffer() {
 
 bool busBufferAvailable() {
     return busBuffer.available();
+}
+
+bool getDAT0(void) {
+    return FAST_READ(0);
 }
 
 // sends a byte,address, and bank to the DAT bus
@@ -72,53 +80,86 @@ void IRAM_ATTR dat0isr() {
     }
 }
 
-// reads a word from the DAT bus when DAT13 rises
-void IRAM_ATTR dat13isr() {
-    busWord13 = 0;
-    // for (uint8_t i = 0; i < 12; i++) {
-    //     // busWord13 |= (digitalRead(datPins[i]) << i);
-    //     // busWord13 |= (digitalRead(datPins[i]) << i);
-    //     busWord13 |= (FAST_READ(i) << i);
-    // }
-    busWord13 |= (FAST_READ(0) << 0);
-    busWord13 |= (FAST_READ(1) << 1);
-    busWord13 |= (FAST_READ(2) << 2);
-    busWord13 |= (FAST_READ(3) << 3);
-    busWord13 |= (FAST_READ(4) << 4);
-    busWord13 |= (FAST_READ(5) << 5);
-    busWord13 |= (FAST_READ(6) << 6);
-    busWord13 |= (FAST_READ(7) << 7);
-    busWord13 |= (FAST_READ(8) << 8);
-    busWord13 |= (FAST_READ(9) << 9);
-    busWord13 |= (FAST_READ(10) << 10);
-    busWord13 |= (FAST_READ(11) << 11);
-    busWord13 |= (1<<12);
-    // push to word stack with bank = 0
-    busBuffer.put(busWord13);
+//return true if pin was high for at least `debouncing_time` microseconds
+bool IRAM_ATTR debounceDAT13() {
+    if (FAST_READ(12) == 1) { //dat 13 is high
+        last_microsDAT13 = micros();
+        return false;
+    }
+    // dat13 is low
+    return ((micros() - last_microsDAT13) >= debouncing_time);
 }
 
-// reads a word from the DAT bus when DAT14 rises
+//return true if pin was high for at least `debouncing_time` microseconds
+bool IRAM_ATTR debounceDAT14() {
+    if (FAST_READ(13) == 1) { //dat 14 is high
+        last_microsDAT14 = micros(); //store the current time
+        return false;
+    }
+    // dat14 is low
+    return ((micros() - last_microsDAT14) >= debouncing_time); 
+}
+
+// reads a word from the DAT bus when DAT13 has been high for at least `debouncing_time` microseconds before falling
+void IRAM_ATTR dat13isr() {
+    if(debounceDAT13()) {
+        //busWord13 = 0;
+        // for (uint8_t i = 0; i < 12; i++) {
+        //     // busWord13 |= (digitalRead(datPins[i]) << i);
+        //     // busWord13 |= (digitalRead(datPins[i]) << i);
+        //     busWord13 |= (FAST_READ(i) << i);
+        // }
+        // busWord13 |= (FAST_READ(0) << 0);
+        // busWord13 |= (FAST_READ(1) << 1);
+        // busWord13 |= (FAST_READ(2) << 2);
+        // busWord13 |= (FAST_READ(3) << 3);
+        // busWord13 |= (FAST_READ(4) << 4);
+        // busWord13 |= (FAST_READ(5) << 5);
+        // busWord13 |= (FAST_READ(6) << 6);
+        // busWord13 |= (FAST_READ(7) << 7);
+        // busWord13 |= (FAST_READ(8) << 8);
+        // busWord13 |= (FAST_READ(9) << 9);
+        // busWord13 |= (FAST_READ(10) << 10);
+        // busWord13 |= (FAST_READ(11) << 11);
+        // busWord13 |= (1<<12);
+        
+        //busWord13 = GPIO.in;
+
+
+        busWord13 = (FAST_READ(0) << 0)|(FAST_READ(1) << 1)|(FAST_READ(2) << 2)|(FAST_READ(3) << 3)| (FAST_READ(4) << 4)|(FAST_READ(5) << 5)|(FAST_READ(6) << 6)
+        |(FAST_READ(7) << 7)|(FAST_READ(8) << 8)|(FAST_READ(9) << 9)|(FAST_READ(10) << 10)|(FAST_READ(11) << 11)|(1<<12);
+        // push to word stack with bank = 0
+        busBuffer.put(busWord13);
+    }
+}
+
+// reads a word from the DAT bus when DAT14 has been high for at least `debouncing_time` microseconds before falling
 void IRAM_ATTR dat14isr() {
-    busWord14 = 0;
-    // for (uint8_t i = 0; i < 12; i++) {
-    //     // busWord14 |= (digitalRead(datPins[i]) << i);
-    //     busWord14 |= (FAST_READ(i) << i);
-    // }
-    busWord14 |= (FAST_READ(0) << 0);
-    busWord14 |= (FAST_READ(1) << 1);
-    busWord14 |= (FAST_READ(2) << 2);
-    busWord14 |= (FAST_READ(3) << 3);
-    busWord14 |= (FAST_READ(4) << 4);
-    busWord14 |= (FAST_READ(5) << 5);
-    busWord14 |= (FAST_READ(6) << 6);
-    busWord14 |= (FAST_READ(7) << 7);
-    busWord14 |= (FAST_READ(8) << 8);
-    busWord14 |= (FAST_READ(9) << 9);
-    busWord14 |= (FAST_READ(10) << 10);
-    busWord14 |= (FAST_READ(11) << 11);
-    busWord14 |= (1<<13);
-    // push to word stack with bank = 1
-    busBuffer.put(busWord14);
+    if(debounceDAT14()) {
+       // busWord14 = 0;
+        // for (uint8_t i = 0; i < 12; i++) {
+        //     // busWord14 |= (digitalRead(datPins[i]) << i);
+        //     busWord14 |= (FAST_READ(i) << i);
+        // }
+        // busWord14 |= (FAST_READ(0) << 0);
+        // busWord14 |= (FAST_READ(1) << 1);
+        // busWord14 |= (FAST_READ(2) << 2);
+        // busWord14 |= (FAST_READ(3) << 3);
+        // busWord14 |= (FAST_READ(4) << 4);
+        // busWord14 |= (FAST_READ(5) << 5);
+        // busWord14 |= (FAST_READ(6) << 6);
+        // busWord14 |= (FAST_READ(7) << 7);
+        // busWord14 |= (FAST_READ(8) << 8);
+        // busWord14 |= (FAST_READ(9) << 9);
+        // busWord14 |= (FAST_READ(10) << 10);
+        // busWord14 |= (FAST_READ(11) << 11);
+        // busWord14 |= (1<<13);
+
+        busWord14 = (FAST_READ(0) << 0)|(FAST_READ(1) << 1)|(FAST_READ(2) << 2)|(FAST_READ(3) << 3)| (FAST_READ(4) << 4)|(FAST_READ(5) << 5)|(FAST_READ(6) << 6)
+        |(FAST_READ(7) << 7)|(FAST_READ(8) << 8)|(FAST_READ(9) << 9)|(FAST_READ(10) << 10)|(FAST_READ(11) << 11)|(1<<13);
+        // push to word stack with bank = 1
+        busBuffer.put(busWord14);
+    }
 }
 
 
@@ -174,20 +215,22 @@ void listenMode(void) {
 
     // set HIJACK level shifters to Hi-Z
     digitalWrite(HIJACK, 0);
+    delayMicroseconds(50);
+
+    // set all DAT pins to be inputs with pullups!
+    setDAT1_14PinMode(INPUT_PULLUP);
 
     // enable communication between native MCU and DSP
     // aka, enable the tristate buffers on the DAT Bus
     digitalWrite(NOT_BUF_OE, 0);
-
-    // set all DAT pins to be inputs with pullups!
-    setDAT1_14PinMode(INPUT_PULLUP);
+    delayMicroseconds(50);
 
     // detatch interrupt from DAT0
     if(mode == MODE_HIJACK) detachInterrupt(digitalPinToInterrupt(DAT0));
 
     // reconfigure interrupts to be triggered by DAT13 and DAT14
-    attachInterrupt(digitalPinToInterrupt(DAT13), dat13isr, RISING);
-    attachInterrupt(digitalPinToInterrupt(DAT14), dat14isr, RISING);
+    attachInterrupt(digitalPinToInterrupt(DAT13), dat13isr, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(DAT14), dat14isr, CHANGE);
 
     // set LISTEN level shifters to normal operation
     digitalWrite(LISTEN, 1);
@@ -201,16 +244,18 @@ void listenMode(void) {
 void hijackMode(void) {
     if (mode == MODE_HIJACK) return;
     // disable interrupts
-    noInterrupts();
+    if(mode != MODE_INIT) noInterrupts();
 
     // set LISTEN level shifters to Hi-Z
     digitalWrite(LISTEN, 0);
-
-    // disable communication between native MCU and DSP
-    digitalWrite(NOT_BUF_OE, 1);
+    delayMicroseconds(50);
 
     // set all DAT pins to be outputs
     setDAT1_14PinMode(OUTPUT);
+
+    // disable communication between native MCU and DSP
+    digitalWrite(NOT_BUF_OE, 1);
+    delayMicroseconds(50);
 
     // detatch interrupt from DAT13,DAT14
     if(mode == MODE_LISTEN) {
