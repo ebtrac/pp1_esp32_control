@@ -19,13 +19,14 @@ VDNXBus::VDNXBus() {
 }
 
 uint8_t VDNXBus::bitreverse(uint8_t b, int len) {
+    if(len == 2) {
+        // return ((reversed>>6)&0x03);
+        return b; // do not need to reverse the bank bits. 
+    }
     uint8_t reversed = 0;
     for (int i = 0; i < 8; ++i) {
         reversed = (reversed << 1) | (b & 1);
         b >>= 1;
-    }
-    if(len == 2) {
-        return ((reversed>>6)&0x03);
     }
     if(len == 4) {
         return ((reversed>>4)&0xF);
@@ -147,9 +148,9 @@ void VDNXBus::writePacket(const UserPacketMap& packet) {
         delayMicroseconds(2);
 
         // latch the word with the bank selection (doesnt work inside an ISR...)
-        digitalWrite(((item.second>>12)&0x1)==0?DAT13:DAT14, 1);
+        digitalWrite(((item.second>>12)&0x1)==1?DAT13:DAT14, 1);
         delayMicroseconds(3);
-        digitalWrite(((item.second>>12)&0x1)==0?DAT13:DAT14, 0);
+        digitalWrite(((item.second>>12)&0x1)==1?DAT13:DAT14, 0);
         delayMicroseconds(3);
     }
 }
@@ -337,7 +338,7 @@ void VDNXBus::listenMode(void) {
     delayMicroseconds(50);
 
     // set all DAT pins to be inputs with pullups!
-    setDAT1_14PinMode(INPUT_PULLUP);
+    setDAT1_14PinMode(INPUT_PULLUP); // ~15.5 us.
 
     // enable communication between native MCU and DSP
     // aka, enable the tristate buffers on the DAT Bus
@@ -370,7 +371,7 @@ void VDNXBus::hijackMode(void) {
     delayMicroseconds(50);
 
     // set all DAT pins to be outputs
-    setDAT1_14PinMode(OUTPUT);
+    setDAT1_14PinMode(OUTPUT); // 15.7~34.4 us. DAT 1 took much longer than the rest.
 
     // disable communication between native MCU and DSP
     digitalWrite(NOT_BUF_OE, 1);

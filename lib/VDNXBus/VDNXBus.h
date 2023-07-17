@@ -18,7 +18,7 @@ enum BusMode {
 // };
 
 // used for storing the packet words in a compressed manner. ready to send.
-// IMPORTANT: each element must be big-endian 
+// IMPORTANT: value and address must be big-endian 
 union PacketWord {
     struct {
         uint8_t value   :8; //value bits    b0..b7
@@ -103,9 +103,9 @@ class VDNXBus {
 
     private:
         BusMode mode;
-        bool transmitListenModeData; // controls whether data will be transmitted via Bluetooth in listen mode
+        volatile bool transmitListenModeData; // controls whether data will be transmitted via Bluetooth in listen mode
         UserPacketMap userPacket;
-        bool injectUserPacket;
+        volatile bool injectUserPacket;
 
         uint8_t datPins[14] = {DAT1, DAT2, DAT3, DAT4, DAT5, DAT6, DAT7, DAT8, DAT9, DAT10, DAT11, DAT12, DAT13, DAT14};
         uint32_t datPinMasks[14];
@@ -114,9 +114,9 @@ class VDNXBus {
         AddressBankMap VDNXMem; // key {address, bank}. emulates DSP's memory addresses. NOTE: big-endian
         
 
-        uint8_t typicalPacketAddresses[20] = {9, 11, 3, 5, 1, 8, 7, 7, 0, 5, 11, 4, 13, 13, 0, 8, 12, 4, 2, 12};
-        uint8_t typicalPacketBanks[20] = {2, 2, 2, 2, 1, 2, 2, 1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 1, 2, 2};
-        uint8_t typicalPacketDefaultValues[20] = {68,149,184,103,38,174,64,130,20,255,0,0,247,0,0,60,47,147,25,14};
+        uint8_t typicalPacketAddresses[20] =     { 9, 11,  3,  5, 1,  8, 7,  7, 0,  5,11, 4, 13, 13, 0, 8, 12,  4, 2, 12};
+        uint8_t typicalPacketBanks[20] =         { 2,  2,  2,  2, 1,  2, 2,  1, 2,  1, 1, 2,  1,  2, 1, 1,  1,  1, 2,  2};
+        uint8_t typicalPacketDefaultValues[20] = {68,149,184,103,38,174,64,130,20,255, 0, 0,247,  0, 0,60, 47,147,25, 14};
 
         uint16_t busWord13 = 0; // temporarily stores the word being read from the bus during an isr
         uint16_t busWord14 = 0; // temporarily stores the word being read from the bus during an isr
