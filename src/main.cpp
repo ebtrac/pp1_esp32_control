@@ -57,10 +57,14 @@ void loop() {
         uint16_t words[32];
         int n = Bus.getUserPacket(words);
         for(int i = 0; i < n; i++) {
-          SerialBT.write((words[i]>>8)&0xFF);
-          SerialBT.write(words[i]&0xFF);
+          SerialBT.write(((words[i]>>8)&0xFF));
+          SerialBT.write((words[i]&0xFF));
           SerialBT.println("");
+          SerialBT.flush();
         }
+      }
+      else if(cmd == "ps") { //packet size.
+        SerialBT.println(Bus.getUserPacketSize());
       }
       else if(cmd == "si") { //set inject setting. example 'si 1' enables packet injection in listen mode
         Bus.setInjectUserPacket(rxbuf[3] == '1');

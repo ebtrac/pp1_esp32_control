@@ -4,7 +4,6 @@
 #include <SCCircularBuffer.h>
 #include <map>
 #include <utility>
-#include <set>
 
 #define MAX_BUFFER_LEN 256
 
@@ -43,7 +42,7 @@ class VDNXBus {
     public:
         VDNXBus();
 
-        uint8_t bitreverse(uint8_t b); // quickly reverses the bits in a given byte
+        uint8_t bitreverse(uint8_t b, int len); // quickly reverses the bits in a given byte
 
         void hijackMode();
 
@@ -94,6 +93,9 @@ class VDNXBus {
         void resetUserPacket();
         void clearUserPacket();
         int getUserPacket(uint16_t *words);
+        int getUserPacketSize() {
+            return userPacket.size();
+        }
 
         void IRAM_ATTR dat0isr();
         void IRAM_ATTR dat13isr();
@@ -109,12 +111,11 @@ class VDNXBus {
         uint32_t datPinMasks[14];
         volatile uint32_t *datPinPorts[14];
 
-        uint8_t dspSettings[16][2]; //first index is address, second index is bank
         AddressBankMap VDNXMem; // key {address, bank}. emulates DSP's memory addresses. NOTE: big-endian
         
 
         uint8_t typicalPacketAddresses[20] = {9, 11, 3, 5, 1, 8, 7, 7, 0, 5, 11, 4, 13, 13, 0, 8, 12, 4, 2, 12};
-        uint8_t typicalPacketBanks[20] = {1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1};
+        uint8_t typicalPacketBanks[20] = {2, 2, 2, 2, 1, 2, 2, 1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 1, 2, 2};
         uint8_t typicalPacketDefaultValues[20] = {68,149,184,103,38,174,64,130,20,255,0,0,247,0,0,60,47,147,25,14};
 
         uint16_t busWord13 = 0; // temporarily stores the word being read from the bus during an isr

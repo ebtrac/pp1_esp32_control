@@ -18,11 +18,22 @@ VDNXBus::VDNXBus() {
     injectUserPacket = false;
 }
 
-uint8_t VDNXBus::bitreverse(uint8_t b) {
-    b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
-    b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
-    b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
-    return b;
+uint8_t VDNXBus::bitreverse(uint8_t b, int len) {
+    uint8_t reversed = 0;
+    for (int i = 0; i < 8; ++i) {
+        reversed = (reversed << 1) | (b & 1);
+        b >>= 1;
+    }
+    if(len == 2) {
+        return ((reversed>>6)&0x03);
+    }
+    if(len == 4) {
+        return ((reversed>>4)&0xF);
+    }
+    if(len == 8) {
+        return reversed;
+    }
+    return 0;
 }
 
 uint16_t VDNXBus::getBuffer() {
@@ -43,8 +54,8 @@ bool VDNXBus::getWriteUserPacketFlag() {
 
 void VDNXBus::removeWordFromUserPacket(uint8_t address, uint8_t bank) {
     uint8_t a,b;
-    a = bitreverse(address);
-    b = bitreverse(bank);
+    a = bitreverse(address,4);
+    b = bitreverse(bank,2);
     userPacket.erase({a,b});
 }
 
@@ -56,9 +67,9 @@ void VDNXBus::resetUserPacket()
     // fill the user packet
     PacketWord pakword;
     for(int i = 0; i < 20; i++) {
-        pakword.address = bitreverse(typicalPacketAddresses[i]);
-        pakword.bank = bitreverse(typicalPacketBanks[i]);
-        pakword.value = bitreverse(typicalPacketDefaultValues[i]);
+        pakword.address = bitreverse(typicalPacketAddresses[i],4);
+        pakword.bank = bitreverse(typicalPacketBanks[i],2);
+        pakword.value = bitreverse(typicalPacketDefaultValues[i],8);
         addWordToUserPacket(pakword);
     }
 }
@@ -71,12 +82,10 @@ void VDNXBus::clearUserPacket() {
 
 int VDNXBus::getUserPacket(uint16_t *words) {
     if(!userPacket.empty()) {
-        int i = 0;
-        for(auto item : userPacket) {
-            words[i] = item.second;
-            i++;
+        for(const auto& item : userPacket) {
+            *words++ = item.second;
         }
-        return i+1;
+        return userPacket.size();
     }
     return 0;
 }
@@ -104,14 +113,14 @@ void VDNXBus::addWordToUserPacket(uint16_t word) {
 }
 
 void VDNXBus::addWordToUserPacket(PacketWord pakword) {
-    userPacket[{(uint8_t)pakword.address, (uint8_t)pakword.bank}] = pakword.word;
+    userPacket[std::make_pair((uint8_t)pakword.address, (uint8_t)pakword.bank)] = pakword.word;
 }
 
 void VDNXBus::addWordToUserPacket(uint8_t value, uint8_t address, uint8_t bank) {
     PacketWord pakword;
-    pakword.value = bitreverse(value);
-    pakword.address = bitreverse(address);
-    pakword.bank = bitreverse(bank);
+    pakword.value = bitreverse(value,8);
+    pakword.address = bitreverse(address,4);
+    pakword.bank = bitreverse(bank,2);
     addWordToUserPacket(pakword);
 }
 
@@ -286,8 +295,7 @@ void VDNXBus::initSettings(void) {
     // set all values to zero first
     for(uint8_t bank = 0; bank < 2; bank++) {
         for(uint8_t adr = 0; adr < 16; adr++) {
-            dspSettings[adr][bank] = 0;
-            VDNXMem[{bitreverse(adr), bitreverse(bank)}] = 0;
+            VDNXMem[{bitreverse(adr,4), bitreverse(bank,2)}] = 0;
         }
     }
 
@@ -297,8 +305,7 @@ void VDNXBus::initSettings(void) {
         adr = typicalPacketAddresses[i];
         bank = typicalPacketBanks[i];
         val = typicalPacketDefaultValues[i];
-        dspSettings[adr][bank] = val;
-        VDNXMem[{bitreverse(adr), bitreverse(bank)}] = bitreverse(val);
+        VDNXMem[{bitreverse(adr,4), bitreverse(bank,2)}] = bitreverse(val,8);
     }
 }
 
