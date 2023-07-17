@@ -14,6 +14,15 @@ VDNXBus::VDNXBus() {
     this->busBuffer = &buf;
     this->mode = Mode_Init;
     instance = this;
+    transmitListenModeData = false;
+    injectUserPacket = false;
+}
+
+uint8_t VDNXBus::bitreverse(uint8_t b) {
+    b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+    b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+    b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+    return b;
 }
 
 uint16_t VDNXBus::getBuffer() {
@@ -28,33 +37,112 @@ bool VDNXBus::getDAT0(void) {
     return FAST_READ(0);
 }
 
-// sends a byte,address, and bank to the DAT bus
-// value : 0-255
-// address : 0-15
-// bank : 0-1 (0 = A = DAT13, 1 = B = DAT14)
-void VDNXBus::writeDAT(uint8_t value, uint8_t address, uint8_t bank) {
-    uint8_t word[] = {0,0,0,0,0,0,0,0,0,0,0,0};
-    // do the byte
-    for(int i = 0; i < 8; i++) {
-        word[i] = uint8_t(((0b10000000 >> i) & value) > 0); // convert to binary
+bool VDNXBus::getWriteUserPacketFlag() {
+    return writeUserPacketFlag;
+}
+
+void VDNXBus::removeWordFromUserPacket(uint8_t address, uint8_t bank) {
+    uint8_t a,b;
+    a = bitreverse(address);
+    b = bitreverse(bank);
+    userPacket.erase({a,b});
+}
+
+void VDNXBus::resetUserPacket()
+{
+    // clear the packet if it's not empty
+    clearUserPacket();
+
+    // fill the user packet
+    PacketWord pakword;
+    for(int i = 0; i < 20; i++) {
+        pakword.address = bitreverse(typicalPacketAddresses[i]);
+        pakword.bank = bitreverse(typicalPacketBanks[i]);
+        pakword.value = bitreverse(typicalPacketDefaultValues[i]);
+        addWordToUserPacket(pakword);
     }
-    // do the address
-    for(int i = 0; i < 4; i++) {
-        word[i+8] = uint8_t(((0b1000 >> i) & address) > 0); // convert to binary
+}
+
+void VDNXBus::clearUserPacket() {
+    if(!userPacket.empty()) {
+        userPacket.clear();
     }
-    // start outputting!
-    // setup value and address outputs
-    for(int i = 0; i < 12; i++) {
-        digitalWrite(datPins[i], word[i]);
+}
+
+int VDNXBus::getUserPacket(uint16_t *words) {
+    if(!userPacket.empty()) {
+        int i = 0;
+        for(auto item : userPacket) {
+            words[i] = item.second;
+            i++;
+        }
+        return i+1;
     }
-    // wait for the circuit to catch up
-    delayMicroseconds(2);
-    
-    // latch the word with the bank signal
-    digitalWrite(bank==0?DAT13:DAT14, 1);
-    delayMicroseconds(3);
-    digitalWrite(bank==0?DAT13:DAT14, 0);
-    delayMicroseconds(3);
+    return 0;
+}
+
+void VDNXBus::setTransmitListenModeData(bool val) {
+    transmitListenModeData = val;
+}
+
+bool VDNXBus::getTransmitListenModeData() {
+    return transmitListenModeData;
+}
+
+void VDNXBus::setInjectUserPacket(bool val) {
+    injectUserPacket = val;
+}
+
+bool VDNXBus::getInjectUserPacket() {
+    return injectUserPacket;
+}
+
+void VDNXBus::addWordToUserPacket(uint16_t word) {
+    PacketWord pakword;
+    pakword.word = word;
+    addWordToUserPacket(pakword);
+}
+
+void VDNXBus::addWordToUserPacket(PacketWord pakword) {
+    userPacket[{(uint8_t)pakword.address, (uint8_t)pakword.bank}] = pakword.word;
+}
+
+void VDNXBus::addWordToUserPacket(uint8_t value, uint8_t address, uint8_t bank) {
+    PacketWord pakword;
+    pakword.value = bitreverse(value);
+    pakword.address = bitreverse(address);
+    pakword.bank = bitreverse(bank);
+    addWordToUserPacket(pakword);
+}
+
+void VDNXBus::removeWordFromUserPacket(uint16_t word) {
+    PacketWord pakword;
+    pakword.word = word;
+    removeWordFromUserPacket(pakword);
+}
+
+void VDNXBus::removeWordFromUserPacket(PacketWord pakword) {
+    userPacket.erase({(uint8_t)pakword.address, (uint8_t)pakword.bank});
+}
+
+void VDNXBus::writePacket(const UserPacketMap& packet) {
+    // item represents a key,value pair
+    // item.first is the key (the address and bank as a std::pair)
+    // item.second is the value (a 16-bit word)
+    for(const auto& item : packet) {
+        // write the value and address b0..b11 out to the Bus
+        for(uint8_t i = 0; i < 12; i++) {
+            digitalWrite(datPins[i], (item.second >> i) & 0x1);
+        }
+        // wait for circuit to catch up (doesnt work inside an ISR...)
+        delayMicroseconds(2);
+
+        // latch the word with the bank selection (doesnt work inside an ISR...)
+        digitalWrite(((item.second>>12)&0x1)==0?DAT13:DAT14, 1);
+        delayMicroseconds(3);
+        digitalWrite(((item.second>>12)&0x1)==0?DAT13:DAT14, 0);
+        delayMicroseconds(3);
+    }
 }
 
 void IRAM_ATTR VDNXBus::dat0isrWrapper() {
@@ -72,10 +160,18 @@ void IRAM_ATTR VDNXBus::dat14isrWrapper() {
         instance->dat14isr();
 }
 
-// writes a typical 20 word packet to the DAT bus when DAT0 falls
+// sets the flag that will allow attemptWriteUserPacketToBus() to fire once
 void IRAM_ATTR VDNXBus::dat0isr() {
-    for(int i = 0; i < 20; i++) {
-        writeDAT(dspSettings[typicalPacketAddresses[i]][typicalPacketBanks[i]], typicalPacketAddresses[i], typicalPacketBanks[i]);
+    // for(int i = 0; i < 20; i++) {
+    //     writeDAT(dspSettings[typicalPacketAddresses[i]][typicalPacketBanks[i]], typicalPacketAddresses[i], typicalPacketBanks[i]);
+    // }
+    if(injectUserPacket) {
+        // for(int i = 0; i < userPacket.length; i++) {
+        //     writeDAT(userPacket.data[i].value, userPacket.data[i].address, userPacket.data[i].bank);
+        // }
+        writeUserPacketFlag = true;
+    } else {
+        writeUserPacketFlag = false;
     }
 }
 
@@ -161,7 +257,19 @@ void IRAM_ATTR VDNXBus::dat14isr() {
     }
 }
 
-BusMode VDNXBus::getMode() {
+void VDNXBus::attemptWriteUserPacketToBus() {
+    if (!(writeUserPacketFlag && injectUserPacket))
+        return;
+    if (mode != Mode_Hijack)
+        return;
+    if(userPacket.empty())
+        return;
+    writePacket(userPacket);
+    writeUserPacketFlag = false;
+}
+
+BusMode VDNXBus::getMode()
+{
     return mode;
 }
 
@@ -176,19 +284,21 @@ void VDNXBus::initFixedModePins(void) {
 // writes some default values to DSP_Settings array
 void VDNXBus::initSettings(void) {
     // set all values to zero first
-    for(int bank = 0; bank < 2; bank++) {
-        for(int adr = 0; adr < 16; adr++) {
+    for(uint8_t bank = 0; bank < 2; bank++) {
+        for(uint8_t adr = 0; adr < 16; adr++) {
             dspSettings[adr][bank] = 0;
+            VDNXMem[{bitreverse(adr), bitreverse(bank)}] = 0;
         }
     }
 
-    int adr,bank,val;
+    uint8_t adr,bank,val;
     // load in default values for typical packet
-    for(int i = 0; i < 20; i++) {
+    for(uint8_t i = 0; i < 20; i++) {
         adr = typicalPacketAddresses[i];
         bank = typicalPacketBanks[i];
         val = typicalPacketDefaultValues[i];
         dspSettings[adr][bank] = val;
+        VDNXMem[{bitreverse(adr), bitreverse(bank)}] = bitreverse(val);
     }
 }
 
@@ -295,7 +405,7 @@ void VDNXBus::initDatBus(void) {
     digitalWrite(LISTEN, 0);
     // initialize DSP_Settings array
     initSettings();
-    // initialize the queue
+    resetUserPacket();
     // begin listen mode
     listenMode();
 }
