@@ -12,8 +12,8 @@ char rxbuf[RX_BUF_SIZE];
 
 void setup() {
   String device_name = "ESP32-VDNX-PP-1";
-    Bus.initDatBus();
-    SerialBT.begin(device_name);
+  Bus.initDatBus();
+  SerialBT.begin(device_name);
 }
 
 void loop() {
@@ -75,24 +75,24 @@ void loop() {
     }
   }
 
-    // handle current mode operations
-    switch(Bus.getMode()) {
-      case Mode_Listen:
-        if(SerialBT.connected()) {
-          if(Bus.getTransmitListenModeData() && Bus.getDAT0() && Bus.busBufferAvailable()) {
-            bufItem = Bus.getBuffer();
-            // write a bus queue item to the BLE in hex followed by /r/n
-            SerialBT.printf("%04x\r\n", bufItem); /////////////////////////////// How long does this take?
-          }
+  // handle current mode operations
+  switch(Bus.getMode()) {
+    case Mode_Listen:
+      if(SerialBT.connected()) {
+        if(Bus.getTransmitListenModeData() && Bus.getDAT0() && Bus.busBufferAvailable()) {
+          bufItem = Bus.getBuffer();
+          // write a bus queue item to the BLE in hex followed by /r/n
+          SerialBT.printf("%04x\r\n", bufItem); /////////////////////////////// How long does this take?
         }
-        break;
+      }
+      break;
 
-      case Mode_Hijack:
-        Bus.attemptWriteUserPacketToBus();
-        break;
-      case Mode_Init:
-        break;
-    }
+    case Mode_Hijack:
+      Bus.attemptWriteUserPacketToBus();
+      break;
+    case Mode_Init:
+      break;
+  }
 }
 
 
