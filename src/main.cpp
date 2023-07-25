@@ -1,56 +1,99 @@
 #include <Arduino.h>
-#include <DATBus.h>
+#include <VDNXBus.h>
 #include <BluetoothSerial.h>
+#include <string>
 
-#define BUF_SIZE 128
-String device_name = "ESP32-VDNX-PP-1";
+#define RX_BUF_SIZE 15
 
 BluetoothSerial SerialBT;
-
-char response[BUF_SIZE];
-int responsepos = 0;
-// DEBUG DATA
-// uint8_t data[] = {68, 149, 184, 103, 38, 174, 64, 130, 20, 255, 0, 0, 247, 0, 0, 60, 47, 147, 25, 14};
-// uint8_t addr[] = {9, 11, 3, 5, 1, 8, 7, 7, 0, 5, 11, 4, 13, 13, 0, 8, 12, 4, 2, 12};
-// uint8_t bank[] = {1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1};
+VDNXBus Bus;
+uint16_t bufItem;
+char rxbuf[RX_BUF_SIZE];
 
 void setup() {
-    initDatBus();
-
-    Serial.begin(115200);
-
-    SerialBT.begin(device_name);
-
+  String device_name = "ESP32-VDNX-PP-1";
+  Bus.initDatBus();
+  SerialBT.begin(device_name);
 }
 
 void loop() {
-  // if(SerialBT.available()) {
-  //   // expects the following string format
-  //   // 00_00_0\r\n
-  //   // which is in hex
-  //   // first byte : value
-  //   // second byte : address
-  //   // end : bank 
-  //   SerialBT.read();
-  //   SerialBT.readBytes(response + responsepos, 1);
-  //   if (responsepos < BUF_SIZE) {
-  //     responsepos++;
-  //   } else {
-  //     responsepos = 0;
-  //   }
-  // }
+  if (SerialBT.connected()) {
+    // scan for user input
+    if (SerialBT.available()) {
+      // process user input
+      SerialBT.readBytes(rxbuf, RX_BUF_SIZE);
 
-  if(SerialBT.connected() && busBufferAvailable()) {
-    uint16_t bufItem = getBuffer();
-    // write a bus queue item to the BLE in hex followed by /r/n
-    SerialBT.printf("%04x\r\n", bufItem); /////////////////////////////// How long does this take?
+      std::string cmd(rxbuf, rxbuf+2); // read the first 2 characters to get a command
+      if (cmd == "mh") {
+        Bus.hijackMode();
+      }
+      else if(cmd == "ml") {
+        Bus.listenMode();
+      }
+      else if(cmd == "gm") { //get mode. 0=Init, 1=Listen, 2=Hijack
+        SerialBT.println(Bus.getMode());
+      }
+      else if(cmd == "st") { //set transmit setting. example `st 1` enables transmit on listen mode
+        Bus.setTransmitListenModeData(rxbuf[3] == '1');
+      }
+      else if(cmd == "gt") { //get transmit setting
+        SerialBT.println((int)Bus.getTransmitListenModeData());
+      }
+      else if(cmd == "pr") { //packet reset. reset packet to default.
+        Bus.resetUserPacket();
+      } 
+      else if(cmd == "pc") { //packet clear. clears the user packet entirely.
+        Bus.clearUserPacket();
+      }
+      else if(cmd == "pa") { //packet add. adds a packet to the userpacket. raw bytes only
+        uint16_t word = (rxbuf[3]<<8)|(rxbuf[4]);
+        Bus.addWordToUserPacket(word);
+      }
+      else if(cmd == "pd") { //packet delete. deletes the packet at the given bank and address
+        uint16_t word = (rxbuf[3]<<8)|(rxbuf[4]);
+        Bus.removeWordFromUserPacket(word);
+      }
+      else if(cmd == "pg") { //packet get. prints the entire user packet. returns raw bytes separated by '\r\n'
+        uint16_t words[32];
+        int n = Bus.getUserPacket(words);
+        for(int i = 0; i < n; i++) {
+          SerialBT.write(((words[i]>>8)&0xFF));
+          SerialBT.write((words[i]&0xFF));
+          SerialBT.println("");
+          SerialBT.flush();
+        }
+      }
+      else if(cmd == "ps") { //packet size.
+        SerialBT.println(Bus.getUserPacketSize());
+      }
+      else if(cmd == "si") { //set inject setting. example 'si 1' enables packet injection in listen mode
+        Bus.setInjectUserPacket(rxbuf[3] == '1');
+      }
+      else if(cmd == "gi") { //get inject setting.
+        SerialBT.println((int)Bus.getInjectUserPacket());
+      }
+    }
   }
 
-  //DEBUG: write debug data
-    // for(int i = 0; i<sizeof(data); i++) {
-    //     writeDAT(data[i], addr[i], bank[i]);
-    // }
-    // delay(16);
+  // handle current mode operations
+  switch(Bus.getMode()) {
+    case Mode_Listen:
+      if(SerialBT.connected()) {
+        if(Bus.getTransmitListenModeData() && Bus.getDAT0() && Bus.busBufferAvailable()) {
+          bufItem = Bus.getBuffer();
+          // write a bus queue item to the BLE in hex followed by /r/n
+          SerialBT.printf("%04x\r\n", bufItem); /////////////////////////////// How long does this take?
+        }
+      }
+      break;
+
+    case Mode_Hijack:
+      Bus.attemptWriteUserPacketToBus();
+      break;
+    case Mode_Init:
+      break;
+  }
 }
+
 
 
