@@ -286,8 +286,8 @@ BusMode VDNXBus::getMode()
 // initialize the pins that will never change pinMode
 void VDNXBus::initFixedModePins(void) {
     pinMode(DAT0, INPUT);
-    pinMode(LISTEN, OUTPUT);
-    pinMode(HIJACK, OUTPUT);
+    pinMode(NOT_LISTEN, OUTPUT);
+    pinMode(NOT_HIJACK, OUTPUT);
     pinMode(NOT_BUF_OE, OUTPUT);
 }
 
@@ -334,7 +334,7 @@ void VDNXBus::listenMode(void) {
     if(mode != Mode_Init) noInterrupts();
 
     // set HIJACK level shifters to Hi-Z
-    digitalWrite(HIJACK, 0);
+    digitalWrite(NOT_HIJACK, 1);
     delayMicroseconds(50);
 
     // set all DAT pins to be inputs with pullups!
@@ -353,7 +353,7 @@ void VDNXBus::listenMode(void) {
     attachInterrupt(digitalPinToInterrupt(DAT14), VDNXBus::dat14isrWrapper, CHANGE);
 
     // set LISTEN level shifters to normal operation
-    digitalWrite(LISTEN, 1);
+    digitalWrite(NOT_LISTEN, 0);
 
     // enable interrupts
     interrupts();
@@ -367,7 +367,7 @@ void VDNXBus::hijackMode(void) {
     if(mode != Mode_Init) noInterrupts();
 
     // set LISTEN level shifters to Hi-Z
-    digitalWrite(LISTEN, 0);
+    digitalWrite(NOT_LISTEN, 1);
     delayMicroseconds(50);
 
     // set all DAT pins to be outputs
@@ -387,7 +387,7 @@ void VDNXBus::hijackMode(void) {
     attachInterrupt(digitalPinToInterrupt(DAT0), VDNXBus::dat0isrWrapper, FALLING);
 
     // set HIJACK level shifters to normal operation
-    digitalWrite(HIJACK, 1);
+    digitalWrite(NOT_HIJACK, 0);
 
     // enable interrupts
     interrupts();
@@ -408,9 +408,9 @@ void VDNXBus::initDatBus(void) {
     initPinMasksAndPorts();
     initFixedModePins();
     // set HIJACK level shifter to HiZ
-    digitalWrite(HIJACK, 0);
+    digitalWrite(NOT_HIJACK, 1);
      // set LISTEN level shifters to Hi-Z
-    digitalWrite(LISTEN, 0);
+    digitalWrite(NOT_LISTEN, 1);
     // initialize DSP_Settings array
     initSettings();
     resetUserPacket();
