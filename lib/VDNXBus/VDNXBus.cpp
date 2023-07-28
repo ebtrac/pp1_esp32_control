@@ -286,6 +286,7 @@ BusMode VDNXBus::getMode()
 // initialize the pins that will never change pinMode
 void VDNXBus::initFixedModePins(void) {
     pinMode(DAT0, INPUT);
+    pinMode(VID_BLK, INPUT);
     pinMode(NOT_LISTEN, OUTPUT);
     pinMode(NOT_HIJACK, OUTPUT);
     pinMode(NOT_BUF_OE, OUTPUT);

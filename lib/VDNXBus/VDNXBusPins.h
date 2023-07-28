@@ -18,3 +18,4 @@
 #define NOT_BUF_OE    21
 #define NOT_HIJACK 15 //pulled high during boot
 #define NOT_LISTEN 22
+#define VID_BLK 34
